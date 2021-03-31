@@ -60,6 +60,7 @@ STRING kAuthorName            = "Nicholas Herson";
 
 
 STRING MoveToString(MOVE);
+int isLinearCombination(POSITION picks, int nums, int soFar);
 
 void InitializeGame()
 {

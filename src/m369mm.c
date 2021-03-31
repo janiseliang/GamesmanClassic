@@ -105,7 +105,7 @@ int maxb;
 
 
 
-#define BLANK '·'
+#define BLANK '.'
 #define X 'X'
 #define O 'O'
 
@@ -1125,12 +1125,21 @@ char* customUnhash(POSITION pos)
 	}
 	return board;
 }
-
+int hellohello = 1;
 //this is the main unhash function that the C code uses.
 char* unhash(POSITION pos, char* turn, int* piecesLeft, int* numx, int* numo)
 {
 	//piecesLeft = total pieces left during stage 1 (x + o)
 	char* board = (char*)SafeMalloc(BOARDSIZE * sizeof(char));
+	if (hellohello == 1) {
+		generic_hash_context_switch(233);
+		//for (int i = 0; i < 100; i++) {
+		//	(*turn) = (generic_hash_turn(i)==PLAYER_ONE ? X : O);
+		//	board = (char *) generic_hash_unhash(i, board);
+		//	printf("TESTBOARDSTATE!: %d; %s\n", i, board);
+		//}
+		hellohello = 0;
+	}
 	if(gHashWindowInitialized) {
 		//printf("unhashing with tiers\n");
 		TIER tier; TIERPOSITION tierposition;
@@ -1139,6 +1148,8 @@ char* unhash(POSITION pos, char* turn, int* piecesLeft, int* numx, int* numo)
 		generic_hash_context_switch(tier);
 		(*turn) = (generic_hash_turn(tierposition)==PLAYER_ONE ? X : O);
 		board = (char*)generic_hash_unhash(tierposition, board);
+		//printf("POSITION: %llu; TIER: %llu; TIERPOSITION: %llu; ", pos, tier, tierposition);
+		//printf("BOARDSTATE %s\n", board);
 		*piecesLeft = tier/100;
 		*numx = (tier/10)%10;
 		*numo = tier%10;
@@ -1238,44 +1249,55 @@ void SetupTierStuff(){
 
 TIERLIST* gTierChildren(TIER tier) {
 	TIERLIST* list = NULL;
-	int numx, numo, piecesLeft;
-	piecesLeft=(tier/100);
-	numx=(tier/10)%10;
-	numo=tier%10;
-//printf("tier = %d\t", tier);
-	if (piecesLeft !=0) {
-		if(piecesLeft%2==0) { //meaning it is X's turn
-			//if (((piecesLeft == 2) && (numo > 1) && (numx+1 > 1) ) || (piecesLeft > 1))
-			list = CreateTierlistNode(tier-100+10, list);         //adding piece
-			//}
-			//if (((piecesLeft > 1) &&(numx > 0)) || ((piecesLeft == 2) && (numo-1 > 1) && (numx+1 > 1)))  {
-			if (numx > 1) {
-				list = CreateTierlistNode(tier-100+9, list); //adding and removing
+	int piecesLeft = tier / 100;
+	int placedX = (tier / 10) % 10;
+	int placedO = tier % 10;
+	int remainingX, remainingO, removedX, removedO, maxMillsX, maxMillsO;
+
+	if (piecesLeft != 0) {
+		if (piecesLeft % 2 == 0) { //meaning it is X's turn
+			list = CreateTierlistNode(tier - 100 + 10, list);         //adding piece
+			// Now check that child tier from a removal is valid. If so, add it.
+			piecesLeft -= 1;
+			placedX += 1;
+			placedO -= 1;
+			remainingX = piecesLeft / 2;
+			remainingO = piecesLeft / 2 + 1;
+			removedX = 9 - placedX - remainingX;
+			removedO = 9 - placedO - remainingO;
+			maxMillsX = (placedX == 0) ? 0 : (placedX - 1) / 2;
+			maxMillsO = (placedO == 0) ? 0 : (placedO - 1) / 2;
+			if (removedO <= maxMillsX) {
+				list = CreateTierlistNode(tier - 100 + 9, list); //adding and removing
 			}
-		}
-		else{
-			//if (((piecesLeft == 1) && (numo+1 > 1) &&(numx > 1) ) || (piecesLeft > 1)) {
-			list = CreateTierlistNode(tier-100+1, list);         //adding piece
-			//}
-			//if (((piecesLeft > 1) &&(numx > 0)) || ((piecesLeft == 1) && (numo+1 > 1) && (numx-1 > 1))) {
-			if (numo > 1) {
-				list = CreateTierlistNode(tier-100-9, list); //adding and removing
+		} else {
+			list = CreateTierlistNode(tier - 100 + 1, list);         //adding piece
+			// Now check that child tier from a removal is valid. If so, add it.
+			piecesLeft -= 1;
+			placedO += 1;
+			placedX -= 1;
+			remainingX = piecesLeft / 2;
+			remainingO = piecesLeft / 2 + 1;
+			removedX = 9 - placedX - remainingX;
+			removedO = 9 - placedO - remainingO;
+			maxMillsX = (placedX == 0) ? 0 : (placedX - 1) / 2;
+			maxMillsO = (placedO == 0) ? 0 : (placedO - 1) / 2;
+			if (removedX <= maxMillsO) {
+				list = CreateTierlistNode(tier - 100 - 9, list); //adding and removing
 			}
 		}
 	}
-	else if (piecesLeft==0) { //stage 2 or 3. We do not know the turn, so we assume both paths as tier children
-		list=CreateTierlistNode(tier, list);
-		if (numx > 2 && numo > 2) {
-			list = CreateTierlistNode(tier-10, list); //remove X piece
-			list = CreateTierlistNode(tier-1, list); //remove O piece
+	else if (piecesLeft == 0) { //stage 2 or 3. We do not know the turn, so we assume both paths as tier children
+		list = CreateTierlistNode(tier, list);
+		if (placedX > 2 && placedO > 2) {
+			list = CreateTierlistNode(tier - 10, list); //remove X piece
+			list = CreateTierlistNode(tier - 1, list); //remove O piece
 		}
 	}
-	//printf("tier = %d\t", tier);
 	return list;
 }
 
 TIERPOSITION gNumberOfTierPositions (TIER tier) {
-	//printf("%d\n",tier);
 	generic_hash_context_switch(tier);
 	return generic_hash_max_pos();
 }
@@ -1957,7 +1979,7 @@ int find_adjacent(int slot, int *slots)
 	}
 	return num;
 }
-void changetothree(){
+void changetothree() {
 	gameType = 3;
 	BOARDSIZE = 9;
 	maxx = 3;
@@ -1968,9 +1990,7 @@ void changetothree(){
 	kDBName = "3mm";
 }
 
-void changetosix()
-{
-	//printf("changing to 6666666\n");
+void changetosix() {
 	gameType = 6;
 	BOARDSIZE =16;
 	maxx = 6;
@@ -1981,8 +2001,7 @@ void changetosix()
 	kDBName = "6mm";
 }
 
-void changetonine()
-{
+void changetonine() {
 	gameType = 9;
 	BOARDSIZE = 24;
 	maxx = 9;
@@ -2252,7 +2271,7 @@ POSITION StringToPosition(char* board) {
 	int i = 0;
 	for (i = 0; i < BOARDSIZE; i++) {
                 if (board[i] == ' ') {
-		        realBoard[i] = '·';
+		        realBoard[i] = '.';
                 } else {
 		        realBoard[i] = board[i];
                 }
@@ -2268,7 +2287,7 @@ char* PositionToString(POSITION pos) {
 	generic_hash_unhash(pos, &board);
 	char* finalBoard = calloc((BOARDSIZE+1), sizeof(char));
 	for (i = 0; i < BOARDSIZE; i++) {
-                if (board[i] == '·') {
+                if (board[i] == '.') {
                         finalBoard[i] = ' ';
                 } else {
 		        finalBoard[i] = board[i];
@@ -2277,6 +2296,6 @@ char* PositionToString(POSITION pos) {
 	return finalBoard;
 }
 
-char * PositionToEndData(POSITION pos) {
+char* PositionToEndData(POSITION pos) {
 	return NULL;
 }

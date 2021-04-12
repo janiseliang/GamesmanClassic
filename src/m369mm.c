@@ -380,6 +380,90 @@ MOVELIST *GenerateMoves (POSITION position)
 	return moves;
 }
 
+/************************************************************************
+**
+** NAME:        gGenerateUndoMovesToTier
+**
+** DESCRIPTION: Generates all the undomoves of the current position that lead into
+**              the given tier and puts them into a list.
+**
+**
+** INPUTS:      TIER t            : The given tier.
+**              POSITION position : the given position
+**
+** OUTPUTS:     UNDOMOVELIST  : The list of undomoves that lead from the given position
+**                              into the given tier.
+**
+************************************************************************/
+UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
+	UNDOMOVELIST* undoMoves = NULL;
+	char turn;
+	int numX, numO, piecesLeft; //tier = pieces left * 100 + numx * 10 + numo
+	char *board = unhash(position, &turn, &piecesLeft, &numX, &numO);
+	TIERPOSITION tierPosition;
+	TIER thisTier;
+	gUnhashToTierPosition(position, &tierPosition, &thisTier);
+
+	char prevTurn = (turn == X) ? O : X;
+	BOOLEAN validTier = TRUE;
+	BOOLEAN isStage1 == thisTier > 100;
+	
+	int tierDiff = prevTier - thisTier;
+	if (turn == X) {
+		// thistier + 109 = player O placed 1 piece 
+		// thistier + 99 = player O placed 1 piece into a mill, and took one X piece
+		// thistier + 10 = player O moved 1 O piece and took one X piece 
+		// thistier = player O moved and did not take 
+		if (!isStage1 && tierDiff != 109 && tierDiff != 99 && tierDiff != 10 && tierDiff != 0) {
+			validTier = FALSE;
+		} 
+		else if (isStage1 && tierDiff != 109 && tierDiff != 99) {
+			validTier = FALSE; 
+		}
+	} else if (turn == O) {
+		// stage2: thistier + 1 = player X moved, formed mill, and took 1 O piece
+		// stage2: thistier = player X moved, no mill formed
+		// stage1: 154 -> 244 => thistier + 90, X placed 1 piece
+		// stage1: 154 -> 245 => thistier + 91, X placed 1 piece into mill, and took 1 O away 
+		if (!isStage1 && tierDiff != 1 && tierDiff != 0) {
+			validTier = FALSE; 
+		} 
+		else if (isStage1 & tierDiff != 90 && tierDiff != 91) {
+			validTier = FALSE; 
+		}
+	}
+	if (!validTier) {
+		return undoMoves
+	} else {
+		if (isStage1) { //STAGE 1
+			for (curr = 0; curr < BOARDSIZE; curr++) {
+				if (board[curr] = prevTurn) {
+					if (check_mill(board, curr, prevTurn)) {
+						for (toRemove = 0; toRemove < BOARDSIZE; toRemove++) {
+							if (board[toRemove] == BLANK) {
+								//check if toRemove can be taken (i.e. it wasn't in a mill )
+								*undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + toRemove, *undoMoves);
+							}
+						}
+					} else { //not a mill
+						*undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE+curr, *undoMoves);
+					}
+				}
+			}
+		}
+		else if (numX > 3 && numO > 3){ //STAGE 2
+
+		}
+		else {
+		}
+		
+	}
+}
+
+
+POSITION UnDoMove(POSITION position, UNDOMOVE undomove) {
+	return NULL;
+}
 
 /************************************************************************
 **

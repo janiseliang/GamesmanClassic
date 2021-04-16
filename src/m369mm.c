@@ -362,11 +362,11 @@ MOVELIST *GenerateMoves (POSITION position)
 					//printf("this position closes a mill\n");
 					for(to=0; to < BOARDSIZE; to++) {
 						if(can_be_taken(position, to)  && (board[to] != turn)) {
-							z=1;
+							z=1; //at least one of opponent's pieces can be taken 
 							moves = CreateMovelistNode(from*BOARDSIZE*BOARDSIZE + to*BOARDSIZE+from, moves);
 						}
 					}
-					if(millType == 2 && z==0) {
+					if(millType == 2 && z==0) { //millType == 2 seems redundant 
 						moves = CreateMovelistNode(from*BOARDSIZE*BOARDSIZE + from*BOARDSIZE+from, moves);
 					}
 				}
@@ -405,6 +405,10 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 	TIERPOSITION tierPosition;
 	TIER thisTier;
 	gUnhashToTierPosition(position, &tierPosition, &thisTier);
+	BOOLEAN atLeastOneOfOpponentsPiecesCanBeTaken = FALSE;
+
+	int numadjacent;
+	int posadjacent[4];
 
 	char prevTurn = (turn == X) ? O : X;
 	BOOLEAN validTier = TRUE;
@@ -437,24 +441,94 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 	if (!validTier) {
 		return undoMoves
 	} else {
-		if (isStage1) { //STAGE 1
-			for (curr = 0; curr < BOARDSIZE; curr++) {
-				if (board[curr] = prevTurn) {
+		int prevTierPiecesLeft = prevTier % 100; 
+		int prevTierNumX = (prevTier / 10) % 10; 
+		int prevTierNumO = prevTier % 10;  
+
+		if (isStage1 || prevTier > 100) { //STAGE 1
+			for (int curr = 0; curr < BOARDSIZE; curr++) {
+				if (board[curr] == prevTurn) {
+					// if (prevTurn == 'X') {
+					// 	if (prevTierNumO - numO): -> we can take away a piece
+					// else: 
+					// 	just place 
+
 					if (check_mill(board, curr, prevTurn)) {
 						for (toRemove = 0; toRemove < BOARDSIZE; toRemove++) {
 							if (board[toRemove] == BLANK) {
 								//check if toRemove can be taken (i.e. it wasn't in a mill )
-								*undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + toRemove, *undoMoves);
+								board[toRemove] = turn;
+								prevPosition = hash(board, prevTurn, prevTierPiecesLeft, prevTierNumX, prevTierNumO);
+								board[toRemove] = BLANK;
+								if (can_be_taken(prevPosition, toRemove)) {
+									atLeastOneOfOpponentsPiecesCanBeTaken = TRUE; 
+									//not allowed to have moves that take away pieces 
+									if((prevTurn == X) && (prevTierNumO - numO == 0)){
+										break; 
+									} else if ((prevTurn == O) && (prevTierNumX - numX == 0)){
+										break; 
+									}
+									*undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + toRemove, *undoMoves);
+								}
 							}
 						}
+						if (!atLeastOneOfOpponentsPiecesCanBeTaken) {
+							if ((prevTurn == X) && (prevTierNumO - numO == 1)) {
+								break; 
+							} else if ((prevTurn == O) && (prevTierNumX - numX == 1)) {
+								break; 
+							}
+							*undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE+curr, *undoMoves);
+						}
+
 					} else { //not a mill
 						*undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE+curr, *undoMoves);
 					}
 				}
 			}
 		}
-		else if (numX > 3 && numO > 3){ //STAGE 2
-
+		else if (!gFlying || ((turn == X) && (numx > 3)) || ((turn == O) && (numo > 3))){ //STAGE 2
+			for (int curr = 0; curr < BOARDSIZE; curr++) {
+				if (board[curr] == prevTurn) {
+					//get + loop through adjacent positions adjacent positions 
+					num_adjacent = find_adjacent(curr, posadjacent);
+					for (int from_index = 0; from_index < num_adjacent; from_index++) {
+						int from = posadjacent[from_index]
+						if (board[from] == BLANK) {
+							if (check_mill(board, curr, prevTurn)) {
+								for (toRemove = 0; toRemove < BOARDSIZE; toRemove++) {
+									if (board[toRemove] == BLANK && toRemove != from) {
+										//check if toRemove can be taken (i.e. it wasn't in a mill )
+										board[toRemove] = turn;
+										prevPosition = hash(board, prevTurn, prevTierPiecesLeft, prevTierNumX, prevTierNumO);
+										board[toRemove] = BLANK;
+										if (can_be_taken(prevPosition, toRemove)) {
+											atLeastOneOfOpponentsPiecesCanBeTaken = TRUE; 
+											//not allowed to have moves that take away pieces 
+											if((prevTurn == X) && (prevTierNumO - numO == 0)){
+												break; 
+											} else if ((prevTurn == O) && (prevTierNumX - numX == 0)){
+												break; 
+											}
+											*undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + toRemove, *undoMoves);
+										}
+									}
+								}
+								if (!atLeastOneOfOpponentsPiecesCanBeTaken) {
+									if ((prevTurn == X) && (prevTierNumO - numO == 1)) {
+										break; 
+									} else if ((prevTurn == O) && (prevTierNumX - numX == 1)) {
+										break; 
+									}
+									*undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE+from, *undoMoves);
+								}
+							} else {
+								*undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + from, *undoMoves);
+							}
+						}
+					}
+				}
+			}
 		}
 		else {
 		}
@@ -1468,9 +1542,9 @@ BOOLEAN can_be_taken(POSITION position, int slot)
 
 	if(millType == 0)
 		canbetaken = ((!check_mill(board, slot, turn==X ? O : X)) || allMills);
-	if(millType == 1)
+	else if(millType == 1)
 		canbetaken = TRUE;
-	if(millType == 2)
+	else if(millType == 2)
 		canbetaken = ((!check_mill(board, slot, turn==X ? O : X)));
 
 	SafeFree(board);

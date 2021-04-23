@@ -226,6 +226,17 @@ void InitializeGame ()
 
 	InitializeHelpStrings();
 	//printf("initialize game done\n");
+	char boardy[24];
+	boardy[0] = X;
+	for (int i = 1; i < 24; i++) {
+		boardy[i] = BLANK;
+	}
+	POSITION one_x = hash(boardy, O, 17, 1, 0);
+	PrintPosition(one_x, "me", TRUE);
+	UNDOMOVELIST* undomoves = GenerateUndoMovesToTier(one_x, (TIER) 1800);
+	for (; undomoves != NULL; undomoves = undomoves->next) {
+		PrintMove(*undomoves);
+	}
 }
 
 
@@ -384,7 +395,7 @@ MOVELIST *GenerateMoves (POSITION position)
 
 /************************************************************************
 **
-** NAME:        gGenerateUndoMovesToTier
+** NAME:        GenerateUndoMovesToTier
 **
 ** DESCRIPTION: Generates all the undomoves of the current position that lead into
 **              the given tier and puts them into a list.
@@ -412,7 +423,7 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 
 	char prevTurn = (turn == X) ? O : X;
 	BOOLEAN validTier = TRUE;
-	BOOLEAN isStage1 == thisTier > 100;
+	BOOLEAN isStage1 = thisTier > 100;
 	
 	int tierDiff = prevTier - thisTier;
 	if (turn == X) {
@@ -434,12 +445,12 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 		if (!isStage1 && tierDiff != 1 && tierDiff != 0) {
 			validTier = FALSE; 
 		} 
-		else if (isStage1 & tierDiff != 90 && tierDiff != 91) {
+		else if (isStage1 && tierDiff != 90 && tierDiff != 91) {
 			validTier = FALSE; 
 		}
 	}
 	if (!validTier) {
-		return undoMoves
+		return undoMoves;
 	} else {
 		int prevTierPiecesLeft = prevTier % 100; 
 		int prevTierNumX = (prevTier / 10) % 10; 
@@ -454,11 +465,11 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 					// 	just place 
 
 					if (check_mill(board, curr, prevTurn)) {
-						for (toRemove = 0; toRemove < BOARDSIZE; toRemove++) {
+						for (int toRemove = 0; toRemove < BOARDSIZE; toRemove++) {
 							if (board[toRemove] == BLANK) {
 								//check if toRemove can be taken (i.e. it wasn't in a mill )
 								board[toRemove] = turn;
-								prevPosition = hash(board, prevTurn, prevTierPiecesLeft, prevTierNumX, prevTierNumO);
+								POSITION prevPosition = hash(board, prevTurn, prevTierPiecesLeft, prevTierNumX, prevTierNumO);
 								board[toRemove] = BLANK;
 								if (can_be_taken(prevPosition, toRemove)) {
 									atLeastOneOfOpponentsPiecesCanBeTaken = TRUE; 
@@ -468,7 +479,7 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 									} else if ((prevTurn == O) && (prevTierNumX - numX == 0)){
 										break; 
 									}
-									*undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + toRemove*BOARDSIZE + curr, *undoMoves);
+									undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + toRemove*BOARDSIZE + curr, undoMoves);
 								}
 							}
 						}
@@ -478,11 +489,11 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 							} else if ((prevTurn == O) && (prevTierNumX - numX == 1)) {
 								break; 
 							}
-							*undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE+curr, *undoMoves);
+							undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE+curr, undoMoves);
 						}
 
 					} else { //not a mill
-						*undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE+curr, *undoMoves);
+						undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE+curr, undoMoves);
 					}
 				}
 			}
@@ -491,16 +502,16 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 			for (int curr = 0; curr < BOARDSIZE; curr++) {
 				if (board[curr] == prevTurn) {
 					//get + loop through adjacent positions adjacent positions 
-					num_adjacent = find_adjacent(curr, posadjacent);
-					for (int from_index = 0; from_index < num_adjacent; from_index++) {
-						int from = posadjacent[from_index]
+					numadjacent = find_adjacent(curr, posadjacent);
+					for (int from_index = 0; from_index < numadjacent; from_index++) {
+						int from = posadjacent[from_index];
 						if (board[from] == BLANK) {
 							if (check_mill(board, curr, prevTurn)) {
-								for (toRemove = 0; toRemove < BOARDSIZE; toRemove++) {
+								for (int toRemove = 0; toRemove < BOARDSIZE; toRemove++) {
 									if (board[toRemove] == BLANK && toRemove != from) {
 										//check if toRemove can be taken (i.e. it wasn't in a mill )
 										board[toRemove] = turn;
-										prevPosition = hash(board, prevTurn, prevTierPiecesLeft, prevTierNumX, prevTierNumO);
+										POSITION prevPosition = hash(board, prevTurn, prevTierPiecesLeft, prevTierNumX, prevTierNumO);
 										board[toRemove] = BLANK;
 										if (can_be_taken(prevPosition, toRemove)) {
 											atLeastOneOfOpponentsPiecesCanBeTaken = TRUE; 
@@ -510,7 +521,7 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 											} else if ((prevTurn == O) && (prevTierNumX - numX == 0)){
 												break; 
 											}
-											*undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + toRemove, *undoMoves);
+											undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + toRemove, undoMoves);
 										}
 									}
 								}
@@ -520,10 +531,10 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 									} else if ((prevTurn == O) && (prevTierNumX - numX == 1)) {
 										break; 
 									}
-									*undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE+from, *undoMoves);
+									undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE+from, undoMoves);
 								}
 							} else {
-								*undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + from, *undoMoves);
+								undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + from, undoMoves);
 							}
 						}
 					}
@@ -537,11 +548,11 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 					for (int from = 0; from < BOARDSIZE; from++)
 						if (board[from] == BLANK) {
 							if (check_mill(board, curr, prevTurn)) {
-								for (toRemove = 0; toRemove < BOARDSIZE; toRemove++) {
+								for (int toRemove = 0; toRemove < BOARDSIZE; toRemove++) {
 									if (board[toRemove] == BLANK && toRemove != from) {
 										//check if toRemove can be taken (i.e. it wasn't in a mill )
 										board[toRemove] = turn;
-										prevPosition = hash(board, prevTurn, prevTierPiecesLeft, prevTierNumX, prevTierNumO);
+										POSITION prevPosition = hash(board, prevTurn, prevTierPiecesLeft, prevTierNumX, prevTierNumO);
 										board[toRemove] = BLANK;
 										if (can_be_taken(prevPosition, toRemove)) {
 											atLeastOneOfOpponentsPiecesCanBeTaken = TRUE; 
@@ -551,7 +562,7 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 											} else if ((prevTurn == O) && (prevTierNumX - numX == 0)){
 												break; 
 											}
-											*undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + toRemove, *undoMoves);
+											undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + toRemove, undoMoves);
 										}
 									}
 								}
@@ -561,19 +572,20 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 									} else if ((prevTurn == O) && (prevTierNumX - numX == 1)) {
 										break; 
 									}
-									*undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE+from, *undoMoves);
+									undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE+from, undoMoves);
 								}
 							} else {
-								*undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + from, *undoMoves);
+								undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + from, undoMoves);
 							}
 						}
 					}
 				}
 			}
 		}
-		
+		SafeFree(board);	
+		return undoMoves;
 	}
-}
+//might have bracket problems
 
 
 POSITION UnDoMove(POSITION position, UNDOMOVE undomove) {
@@ -616,12 +628,12 @@ POSITION UnDoMove(POSITION position, UNDOMOVE undomove) {
 
 	
 	if (turn == X) {
-		temp = updatepieces(board,O,piecesLeft, numx, numo, move, position);
+		temp = updatepieces(board,O,piecesLeft, numx, numo, undomove, position);
 		SafeFree(board);
 
 	}
 	else{
-		temp = updatepieces(board, X, piecesLeft, numx, numo,move,position);
+		temp = updatepieces(board, X, piecesLeft, numx, numo, undomove,position);
 		SafeFree(board);
 
 	}
@@ -1678,9 +1690,9 @@ BOOLEAN can_be_taken(POSITION position, int slot)
 
 	if(millType == 0)
 		canbetaken = ((!check_mill(board, slot, turn==X ? O : X)) || allMills);
-	else if(millType == 1)
+	if(millType == 1)
 		canbetaken = TRUE;
-	else if(millType == 2)
+	if(millType == 2)
 		canbetaken = ((!check_mill(board, slot, turn==X ? O : X)));
 
 	SafeFree(board);
@@ -2310,24 +2322,24 @@ void changetonine() {
 	//SYMMETRIES
 	kSupportsSymmetries = TRUE; /* Whether we support symmetries */
 
-	//int gSymmetryMatrix2[9][24] = { {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23},{2,1,0,5,4,3,8,7,6,14,13,12,11,10,9,17,16,15,20,19,18,23,22,21},{21,22,23,18,19,20,15,16,17,9,10,11,12,13,14,6,7,8,3,4,5,0,1,2},{23,14,2,20,13,5,17,12,8,22,19,16,7,4,1,15,11,6,18,10,3,21,9,0},{0,9,21,3,10,18,6,11,15,1,4,7,16,19,22,8,12,17,5,13,20,2,14,23},{21,9,0,18,10,3,15,11,6,22,19,16,7,4,1,17,12,8,20,13,5,23,14,2},{23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0},{2,14,23,5,13,20,8,12,17,1,4,7,16,19,22,6,11,15,3,10,18,0,9,21},{6,7,8,3,4,5,0,1,2,11,10,9,14,13,12,21,22,23,18,19,20,15,16,17} };
-	int gSymmetryMatrix2[NUMSYMMETRIES][BOARDSIZE] = {  {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23},
-														{6,7,8,3,4,5,0,1,2,11,10,9,14,13,12,21,22,23,18,19,20,15,16,17}
-														{2,1,0,5,4,3,8,7,6,14,13,12,11,10,9,17,16,15,20,19,18,23,22,21},
-														{8,7,6,5,4,3,2,1,0,12,13,14,9,10,11,23,22,21,20,19,18,17,16,15},
-														{21,22,23,18,19,20,15,16,17,9,10,11,12,13,14,6,7,8,3,4,5,0,1,2},
-														//IN AND OUT
-														{23,14,2,20,13,5,17,12,8,22,19,16,7,4,1,15,11,6,18,10,3,21,9,0},
-														//IN AND OUT
-														{0,9,21,3,10,18,6,11,15,1,4,7,16,19,22,8,12,17,5,13,20,2,14,23},
-														//IN AND OUT
-														{21,9,0,18,10,3,15,11,6,22,19,16,7,4,1,17,12,8,20,13,5,23,14,2},
-														//IN AND OUT
-														{23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0},
-														//IN AND OUT
-														{2,14,23,5,13,20,8,12,17,1,4,7,16,19,22,6,11,15,3,10,18,0,9,21},
-														//IN AND OUT
-													};
+	int gSymmetryMatrix2[9][24] = { {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23},{2,1,0,5,4,3,8,7,6,14,13,12,11,10,9,17,16,15,20,19,18,23,22,21},{21,22,23,18,19,20,15,16,17,9,10,11,12,13,14,6,7,8,3,4,5,0,1,2},{23,14,2,20,13,5,17,12,8,22,19,16,7,4,1,15,11,6,18,10,3,21,9,0},{0,9,21,3,10,18,6,11,15,1,4,7,16,19,22,8,12,17,5,13,20,2,14,23},{21,9,0,18,10,3,15,11,6,22,19,16,7,4,1,17,12,8,20,13,5,23,14,2},{23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0},{2,14,23,5,13,20,8,12,17,1,4,7,16,19,22,6,11,15,3,10,18,0,9,21},{6,7,8,3,4,5,0,1,2,11,10,9,14,13,12,21,22,23,18,19,20,15,16,17} };
+	// int gSymmetryMatrix2[NUMSYMMETRIES][BOARDSIZE] = {  {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23},
+	// 													{6,7,8,3,4,5,0,1,2,11,10,9,14,13,12,21,22,23,18,19,20,15,16,17}
+	// 													{2,1,0,5,4,3,8,7,6,14,13,12,11,10,9,17,16,15,20,19,18,23,22,21},
+	// 													{8,7,6,5,4,3,2,1,0,12,13,14,9,10,11,23,22,21,20,19,18,17,16,15},
+	// 													{21,22,23,18,19,20,15,16,17,9,10,11,12,13,14,6,7,8,3,4,5,0,1,2},
+	// 													//IN AND OUT
+	// 													{23,14,2,20,13,5,17,12,8,22,19,16,7,4,1,15,11,6,18,10,3,21,9,0},
+	// 													//IN AND OUT
+	// 													{0,9,21,3,10,18,6,11,15,1,4,7,16,19,22,8,12,17,5,13,20,2,14,23},
+	// 													//IN AND OUT
+	// 													{21,9,0,18,10,3,15,11,6,22,19,16,7,4,1,17,12,8,20,13,5,23,14,2},
+	// 													//IN AND OUT
+	// 													{23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0},
+	// 													//IN AND OUT
+	// 													{2,14,23,5,13,20,8,12,17,1,4,7,16,19,22,6,11,15,3,10,18,0,9,21},
+	// 													//IN AND OUT
+	// 												};
 
 	int i, k;
 	for (i=0; i < 9; i++) {

@@ -468,7 +468,7 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 									} else if ((prevTurn == O) && (prevTierNumX - numX == 0)){
 										break; 
 									}
-									*undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + toRemove, *undoMoves);
+									*undoMoves = CreateUndoMovelistNode(curr*BOARDSIZE*BOARDSIZE + toRemove*BOARDSIZE + curr, *undoMoves);
 								}
 							}
 						}
@@ -487,7 +487,7 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 				}
 			}
 		}
-		else if (!gFlying || ((turn == X) && (numx > 3)) || ((turn == O) && (numo > 3))){ //STAGE 2
+		else if (!gFlying || ((prevTurn == X) && (prevTierNumX > 3)) || ((prevTurn == O) && (prevTierNumO > 3))){ //STAGE 2
 			for (int curr = 0; curr < BOARDSIZE; curr++) {
 				if (board[curr] == prevTurn) {
 					//get + loop through adjacent positions adjacent positions 
@@ -531,6 +531,45 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 			}
 		}
 		else {
+			for (int curr = 0; curr < BOARDSIZE; curr++) {
+				if (board[curr] == prevTurn) {
+					//get + loop through adjacent positions adjacent positions 
+					for (int from = 0; from < BOARDSIZE; from++)
+						if (board[from] == BLANK) {
+							if (check_mill(board, curr, prevTurn)) {
+								for (toRemove = 0; toRemove < BOARDSIZE; toRemove++) {
+									if (board[toRemove] == BLANK && toRemove != from) {
+										//check if toRemove can be taken (i.e. it wasn't in a mill )
+										board[toRemove] = turn;
+										prevPosition = hash(board, prevTurn, prevTierPiecesLeft, prevTierNumX, prevTierNumO);
+										board[toRemove] = BLANK;
+										if (can_be_taken(prevPosition, toRemove)) {
+											atLeastOneOfOpponentsPiecesCanBeTaken = TRUE; 
+											//not allowed to have moves that take away pieces 
+											if((prevTurn == X) && (prevTierNumO - numO == 0)){
+												break; 
+											} else if ((prevTurn == O) && (prevTierNumX - numX == 0)){
+												break; 
+											}
+											*undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + toRemove, *undoMoves);
+										}
+									}
+								}
+								if (!atLeastOneOfOpponentsPiecesCanBeTaken) {
+									if ((prevTurn == X) && (prevTierNumO - numO == 1)) {
+										break; 
+									} else if ((prevTurn == O) && (prevTierNumX - numX == 1)) {
+										break; 
+									}
+									*undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE+from, *undoMoves);
+								}
+							} else {
+								*undoMoves = CreateUndoMovelistNode(from*BOARDSIZE*BOARDSIZE + curr*BOARDSIZE + from, *undoMoves);
+							}
+						}
+					}
+				}
+			}
 		}
 		
 	}
@@ -538,7 +577,61 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 
 
 POSITION UnDoMove(POSITION position, UNDOMOVE undomove) {
-	return NULL;
+	char* board;
+	char turn;
+	int piecesLeft;
+	int numx, numo;
+	POSITION temp;
+
+	//printf("inside DoMove\n");
+	board = unhash(position, &turn, &piecesLeft, &numx, &numo);
+
+	//printf("numx: %d, numo:%d, piecesLeft: %d\n", numx, numo, piecesLeft);
+
+	int curr = (undomove%(BOARDSIZE*BOARDSIZE)) / BOARDSIZE;
+	int from = undomove / (BOARDSIZE * BOARDSIZE);
+	int remove = undomove % BOARDSIZE;
+
+	if (piecesLeft == 0) // STAGE 2 or 3, SLIDING OR FLYING
+	{
+		//printf("inside DoMove. to=%d, from = %d, remove = %d\n", to, from, remove); //DEBUG
+		board[from] = board[curr]; // DIFFERENCE FROM DOMOVE
+		board[curr] = BLANK; // DIFFERENCE FROM DOMOVE
+		if (from != remove) {
+			board[remove] = turn; // DIFFERENCE FROM DOMOVE //if remove wasn't specified in the string, it is by default equal to from
+		}
+	}
+
+	else // STAGE 1 : PLACING
+	{
+		//printf("DoMove stage 1\n");
+		board[from] = BLANK;
+		if (from != curr)
+			board[curr] = turn;
+	}
+
+	//printf("numx: %d numo: %d\n", numx, numo);
+
+	//printf("DOMOVE TURN: %d\n", turn);
+
+	
+	if (turn == X) {
+		temp = updatepieces(board,O,piecesLeft, numx, numo, move, position);
+		SafeFree(board);
+
+	}
+	else{
+		temp = updatepieces(board, X, piecesLeft, numx, numo,move,position);
+		SafeFree(board);
+
+	}
+
+	TIER tier; TIERPOSITION tierposition;
+	gUnhashToTierPosition(position, &tierposition, &tier);
+	gCurrentTier = tier;
+	//printf("current tier = %d\n", (int)gCurrentTier);
+
+	return temp;
 }
 
 /************************************************************************
@@ -1485,7 +1578,7 @@ POSITION updatepieces(char* board,char turn,int piecesLeft,int numx,int numo,MOV
 
 	if (piecesLeft != 0)
 	{
-		if (turn != X)
+		if (turn != X) //turn == X??? 
 		{
 			numx++;
 			if (from != to) //1st pos != 2nd pos [removing a piece]
@@ -1510,6 +1603,49 @@ POSITION updatepieces(char* board,char turn,int piecesLeft,int numx,int numo,MOV
 		{
 			if (from != remove) //1st pos != 3rd pos [removing a piece]
 				numx--;
+		}
+	}
+	//printf("turn=%d, numx=%d, numo=%d, totalPieces=%d, turn = %c\n", generic_hash_turn(position), numx, numo, piecesLeft, turn); //debug
+	return hash(board, turn, piecesLeft, numx, numo);
+}
+
+//updates totalPieces
+POSITION undoUpdatePieces(char* board, char turn, int piecesLeft, int numx, int numo, UNDOMOVE undoMove, POSITION position)
+{
+
+
+	int curr = (undoMove%(BOARDSIZE*BOARDSIZE)) / BOARDSIZE;
+	int from = undoMove / (BOARDSIZE * BOARDSIZE);
+	int remove = undoMove % BOARDSIZE;
+	//passing in the turn who we just undid (prevTurn)
+
+	if (piecesLeft != 0) //Stage 1
+	{
+		if (turn == X) //previously, we undid X's move -> //x removed a piece from the board, and if 
+		{
+			numx--;
+			if (from != curr) //1st pos != 2nd pos [removing a piece]
+				numo++;
+		}
+		else
+		{
+			numo--;
+			if (from != curr) //1st pos != 2nd pos [removing a piece]
+				numx++;
+		}
+		piecesLeft++;
+	}
+	else if (piecesLeft == 0) //stage 2 & 3
+	{
+		if (turn == X)
+		{
+			if (from != remove) //1st pos != 3nd pos [removing a piece]
+				numo++;
+		}
+		else
+		{
+			if (from != remove) //1st pos != 3rd pos [removing a piece]
+				numx++;
 		}
 	}
 	//printf("turn=%d, numx=%d, numo=%d, totalPieces=%d, turn = %c\n", generic_hash_turn(position), numx, numo, piecesLeft, turn); //debug

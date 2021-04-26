@@ -1182,6 +1182,8 @@ solve_start: // GASP!! A LABEL!!
 }
 
 void LoopyParentsHelper(POSITIONLIST* list, VALUE valueParents, REMOTENESS remotenessChild) {
+	printf("--------\n");
+	printf("%d", useUndo);
 	POSITION child, parent;
 	FRnode *miniLoseFR = NULL;
 	UNDOMOVELIST *parents, *parentsPtr;

@@ -177,7 +177,9 @@ void changetothree();
 POSITION GetCanonicalPosition(POSITION);
 POSITION smallHash(char*, char);
 char* smallUnhash(POSITION, char*);
-
+UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier);
+POSITION UndoMove(POSITION position, UNDOMOVE undomove);
+POSITION undoUpdatePieces(char* board, char turn, int piecesLeft, int numx, int numo, UNDOMOVE undoMove, POSITION position);
 
 //SYMMETRIES
 BOOLEAN kSupportsSymmetries = FALSE; /* Default false, true for 9mm*/
@@ -201,6 +203,10 @@ int gSymmetryMatrix[NUMSYMMETRIES][BOARDSIZE9mm];
 
 void InitializeGame ()
 {
+
+	//added in: 
+	gameType = 9; 
+	
 	int i;
 	// SYMMETRY
 	gCanonicalPosition = GetCanonicalPosition;
@@ -211,6 +217,8 @@ void InitializeGame ()
 
 	int pminmax[] = {X, 0, maxx, O, 0, maxo,BLANK, BOARDSIZE-maxx-maxo, BOARDSIZE, -1};
 
+	gUnDoMoveFunPtr = &UndoMove;
+	gGenerateUndoMovesToTierFunPtr = &GenerateUndoMovesToTier;
 	gCustomUnhash = &customUnhash;
 	gReturnTurn = &returnTurn;
 	SetupTierStuff();
@@ -225,18 +233,8 @@ void InitializeGame ()
 	gInitialPosition = hash(board, X, maxx+maxo, 0, 0);
 
 	InitializeHelpStrings();
+	
 	//printf("initialize game done\n");
-	char boardy[24];
-	boardy[0] = X;
-	for (int i = 1; i < 24; i++) {
-		boardy[i] = BLANK;
-	}
-	POSITION one_x = hash(boardy, O, 17, 1, 0);
-	PrintPosition(one_x, "me", TRUE);
-	UNDOMOVELIST* undomoves = GenerateUndoMovesToTier(one_x, (TIER) 1800);
-	for (; undomoves != NULL; undomoves = undomoves->next) {
-		PrintMove(*undomoves);
-	}
 }
 
 
@@ -298,6 +296,8 @@ void InitializeHelpStrings ()
 
 MOVELIST *GenerateMoves (POSITION position)
 {
+
+
 	//printf("%llu\n", position);
 	MOVELIST *moves = NULL;
 	//MOVELIST *temp = NULL;	//DEBUG
@@ -409,6 +409,8 @@ MOVELIST *GenerateMoves (POSITION position)
 **
 ************************************************************************/
 UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
+	PrintPosition(position, "me", TRUE);
+
 	UNDOMOVELIST* undoMoves = NULL;
 	char turn;
 	int numX, numO, piecesLeft; //tier = pieces left * 100 + numx * 10 + numo
@@ -582,13 +584,20 @@ UNDOMOVELIST* GenerateUndoMovesToTier(POSITION position, TIER prevTier) {
 				}
 			}
 		}
+		UNDOMOVELIST* pointer = undoMoves;
+		while (pointer != NULL) {
+			PrintMove(pointer->undomove);
+			printf("\n");
+			pointer = pointer->next;  
+		}
+
 		SafeFree(board);	
 		return undoMoves;
 	}
 //might have bracket problems
 
 
-POSITION UnDoMove(POSITION position, UNDOMOVE undomove) {
+POSITION UndoMove(POSITION position, UNDOMOVE undomove) {
 	char* board;
 	char turn;
 	int piecesLeft;
@@ -2322,24 +2331,25 @@ void changetonine() {
 	//SYMMETRIES
 	kSupportsSymmetries = TRUE; /* Whether we support symmetries */
 
-	int gSymmetryMatrix2[9][24] = { {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23},{2,1,0,5,4,3,8,7,6,14,13,12,11,10,9,17,16,15,20,19,18,23,22,21},{21,22,23,18,19,20,15,16,17,9,10,11,12,13,14,6,7,8,3,4,5,0,1,2},{23,14,2,20,13,5,17,12,8,22,19,16,7,4,1,15,11,6,18,10,3,21,9,0},{0,9,21,3,10,18,6,11,15,1,4,7,16,19,22,8,12,17,5,13,20,2,14,23},{21,9,0,18,10,3,15,11,6,22,19,16,7,4,1,17,12,8,20,13,5,23,14,2},{23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0},{2,14,23,5,13,20,8,12,17,1,4,7,16,19,22,6,11,15,3,10,18,0,9,21},{6,7,8,3,4,5,0,1,2,11,10,9,14,13,12,21,22,23,18,19,20,15,16,17} };
-	// int gSymmetryMatrix2[NUMSYMMETRIES][BOARDSIZE] = {  {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23},
-	// 													{6,7,8,3,4,5,0,1,2,11,10,9,14,13,12,21,22,23,18,19,20,15,16,17}
-	// 													{2,1,0,5,4,3,8,7,6,14,13,12,11,10,9,17,16,15,20,19,18,23,22,21},
-	// 													{8,7,6,5,4,3,2,1,0,12,13,14,9,10,11,23,22,21,20,19,18,17,16,15},
-	// 													{21,22,23,18,19,20,15,16,17,9,10,11,12,13,14,6,7,8,3,4,5,0,1,2},
-	// 													//IN AND OUT
-	// 													{23,14,2,20,13,5,17,12,8,22,19,16,7,4,1,15,11,6,18,10,3,21,9,0},
-	// 													//IN AND OUT
-	// 													{0,9,21,3,10,18,6,11,15,1,4,7,16,19,22,8,12,17,5,13,20,2,14,23},
-	// 													//IN AND OUT
-	// 													{21,9,0,18,10,3,15,11,6,22,19,16,7,4,1,17,12,8,20,13,5,23,14,2},
-	// 													//IN AND OUT
-	// 													{23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0},
-	// 													//IN AND OUT
-	// 													{2,14,23,5,13,20,8,12,17,1,4,7,16,19,22,6,11,15,3,10,18,0,9,21},
-	// 													//IN AND OUT
-	// 												};
+	//int gSymmetryMatrix2[9][24] = { {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23},{2,1,0,5,4,3,8,7,6,14,13,12,11,10,9,17,16,15,20,19,18,23,22,21},{21,22,23,18,19,20,15,16,17,9,10,11,12,13,14,6,7,8,3,4,5,0,1,2},{23,14,2,20,13,5,17,12,8,22,19,16,7,4,1,15,11,6,18,10,3,21,9,0},{0,9,21,3,10,18,6,11,15,1,4,7,16,19,22,8,12,17,5,13,20,2,14,23},{21,9,0,18,10,3,15,11,6,22,19,16,7,4,1,17,12,8,20,13,5,23,14,2},{23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0},{2,14,23,5,13,20,8,12,17,1,4,7,16,19,22,6,11,15,3,10,18,0,9,21},{6,7,8,3,4,5,0,1,2,11,10,9,14,13,12,21,22,23,18,19,20,15,16,17} };
+	
+	int gSymmetryMatrix2[NUMSYMMETRIES][24] = { {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23}, //standard
+												{6,7,8,3,4,5,0,1,2,11,10,9,14,13,12,21,22,23,18,19,20,15,16,17}, //in/out ref
+												{2,1,0,5,4,3,8,7,6,14,13,12,11,10,9,17,16,15,20,19,18,23,22,21}, //y-axis ref
+												{8,7,6,5,4,3,2,1,0,12,13,14,9,10,11,23,22,21,20,19,18,17,16,15}, //y-axis ref + in/out
+												{21,22,23,18,19,20,15,16,17,9,10,11,12,13,14,6,7,8,3,4,5,0,1,2}, //x-axis ref
+												{15,16,17,18,19,20,21,22,23,11,10,9,14,13,12,0,1,2,3,4,5,6,7,8}, //x axis ref + in/out
+												{23,14,2,20,13,5,17,12,8,22,19,16,7,4,1,15,11,6,18,10,3,21,9,0}, //y=x ref
+												{17,12,8,20,13,5,23,14,2,16,19,22,1,4,7,21,9,0,18,10,3,15,11,6}, //y=x ref + in/out
+												{0,9,21,3,10,18,6,11,15,1,4,7,16,19,22,8,12,17,5,13,20,2,14,23}, //y=-x ref
+												{6,11,15,3,10,18,0,9,21,7,4,1,22,19,16,2,14,23,5,13,20,8,12,17}, //y=-x ref + in/out
+												{21,9,0,18,10,3,15,11,6,22,19,16,7,4,1,17,12,8,20,13,5,23,14,2}, //y=-x ref + y-axis ref
+												{15,11,6,18,10,3,21,9,0,16,19,22,1,4,7,23,14,2,20,13,5,17,12,8}, //y=-x ref + y-axis ref + in/out
+												{23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0}, //x-axis ref + y-axis ref
+												{17,16,15,20,19,18,23,22,21,12,13,14,9,10,11,2,1,0,5,4,3,8,7,6}, //x-axis ref + y-axis ref + in/out
+												{2,14,23,5,13,20,8,12,17,1,4,7,16,19,22,6,11,15,3,10,18,0,9,21}, //y=x ref + y-axis ref
+												{8,12,17,5,13,20,2,14,23,7,4,1,22,19,16,0,9,21,3,10,18,6,11,15}  //y=x ref + y-axis ref + in/out
+											};
 
 	int i, k;
 	for (i=0; i < 9; i++) {
